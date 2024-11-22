@@ -1,0 +1,17 @@
+{
+    "name": "reggae-lang",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build"
+    },
+    "keywords": [],
+    "author": "Matheus",
+    "license": "ISC",
+    "description": "",
+    "devDependencies": {
+        "typescript": "^5.5.4",
+        "vite": "^5.4.2"
+    }
+}
