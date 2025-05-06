@@ -1,0 +1,5 @@
+roots x = "Bob Marley";
+roots y = 'Reggae Music!';
+roots z = 123;
+
+sound(x, y, z);
