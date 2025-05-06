@@ -1,0 +1,146 @@
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum Keyword {
+    Roots,
+    If,
+    Else,
+    While,
+}
+
+#[derive(Debug, Clone)]
+pub enum Token {
+    Identifier(String),
+    Keyword(Keyword),
+    // Literals
+    StringLiteral(String),
+    NumberLiteral(i64),
+    // Symbols
+    SemiColon,
+    OpenParen,
+    CloseParen,
+    Equals,
+    Colon,
+}
+
+#[derive(Debug)]
+pub struct Lexer {
+    content: Vec<char>,
+    cursor: usize,
+}
+
+impl Lexer {
+    pub fn new(content: String) -> Self {
+        Self {
+            content: content.chars().collect(),
+            cursor: 0,
+        }
+    }
+
+    fn chop(&mut self) {
+        while let Some(char) = self.content.get(self.cursor) {
+            if char.is_whitespace() {
+                self.cursor += 1
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn peek(&self) -> Option<char> {
+        if let Some(ch) = self.content.get(self.cursor) {
+            Some(*ch)
+        } else {
+            None
+        }
+    }
+
+    fn consume(&mut self) -> Option<char> {
+        let ch = self.peek();
+        self.cursor += 1;
+        ch
+    }
+
+    fn try_parse_string_literal(&mut self, delimiter: char) -> Result<Token, ()> {
+        let start = self.cursor;
+        while let Some(ch) = self.consume() {
+            if ch == delimiter {
+                return Ok(Token::StringLiteral(
+                    self.content[start..self.cursor - 1]
+                        .iter()
+                        .collect::<String>(),
+                ));
+            }
+        }
+        // TODO: proper error handling
+        Err(())
+    }
+
+    fn try_parse_identifier_and_keyword(&mut self) -> Result<Token, ()> {
+        let start = self.cursor;
+        while let Some(ch) = self.peek() {
+            if !ch.is_alphanumeric() {
+                break;
+            }
+            self.cursor += 1;
+        }
+
+        let result = self.content[start - 1..self.cursor]
+            .iter()
+            .collect::<String>();
+
+        Ok(match result.as_str() {
+            "roots" => Token::Keyword(Keyword::Roots),
+            _ => Token::Identifier(result),
+        })
+    }
+
+    fn try_parse_number(&mut self) -> Result<Token, ()> {
+        let start = self.cursor;
+        while let Some(ch) = self.peek() {
+            if !ch.is_numeric() {
+                break;
+            }
+            self.cursor += 1;
+        }
+
+        let result = self.content[start - 1..self.cursor]
+            .iter()
+            .collect::<String>();
+
+        Ok(Token::NumberLiteral(result.parse::<i64>().map_err(|_| ())?))
+    }
+
+    fn next(&mut self) -> Result<Token, ()> {
+        self.chop();
+        let consume = self.consume();
+        if let Some(current) = consume {
+            match current {
+                ';' => Ok(Token::SemiColon),
+                '(' => Ok(Token::OpenParen),
+                ')' => Ok(Token::CloseParen),
+                '=' => Ok(Token::Equals),
+                ',' => Ok(Token::Colon),
+                '\'' | '"' => Ok(self.try_parse_string_literal(current)?),
+                ch => {
+                    if ch.is_numeric() {
+                        Ok(self.try_parse_number()?)
+                    } else if ch.is_alphabetic() {
+                        self.try_parse_identifier_and_keyword()
+                    } else {
+                        Err(())
+                    }
+                }
+            }
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn parse(&mut self) -> Vec<Token> {
+        let mut tokens = Vec::new();
+        while let Ok(token) = self.next() {
+            tokens.push(token);
+        }
+        tokens
+    }
+}
