@@ -3,7 +3,7 @@ mod parser;
 
 use lexer::{Lexer, Token};
 use parser::{Expression, Parser, Statement};
-use std::{collections::HashMap, env, fs};
+use std::{collections::HashMap, env, error::Error, fs};
 
 enum Type {
     Int(i64),
@@ -28,17 +28,17 @@ fn expression_to_type(expression: Expression) -> Type {
     }
 }
 
-fn main() -> Result<(), ()> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let file_path = args.get(1).expect("file path not provided");
     let content = fs::read_to_string(file_path).expect("could not read the file");
 
     let mut lexer = Lexer::new(content);
-    let mut parser = Parser::new(lexer.parse());
+    let mut parser = Parser::new(lexer.parse()?);
 
     let mut variables: HashMap<String, Type> = HashMap::new();
 
-    for statment in parser.parse() {
+    for statment in parser.parse()? {
         match statment {
             Statement::VariableDeclaration { name, expression } => {
                 let ty = expression_to_type(expression);

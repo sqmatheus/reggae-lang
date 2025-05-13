@@ -1,3 +1,8 @@
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+};
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Keyword {
@@ -6,6 +11,30 @@ pub enum Keyword {
     Else,
     While,
 }
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq)]
+pub enum LexerError {
+    InvalidNumberLiteral,
+    StringLiteralNotClosed,
+    UnexpectedChar(char),
+    Eof,
+    Unknown,
+}
+
+impl Display for LexerError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            LexerError::InvalidNumberLiteral => write!(f, "Invalid number literal"),
+            LexerError::StringLiteralNotClosed => write!(f, "String literal not closed"),
+            LexerError::UnexpectedChar(ch) => write!(f, "Unexpected {}", ch),
+            LexerError::Eof => write!(f, "End of file"),
+            LexerError::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl Error for LexerError {}
 
 #[derive(Debug, Clone)]
 pub enum Token {
@@ -60,7 +89,7 @@ impl Lexer {
         ch
     }
 
-    fn try_parse_string_literal(&mut self, delimiter: char) -> Result<Token, ()> {
+    fn try_parse_string_literal(&mut self, delimiter: char) -> Result<Token, LexerError> {
         let start = self.cursor;
         while let Some(ch) = self.consume() {
             if ch == delimiter {
@@ -71,11 +100,10 @@ impl Lexer {
                 ));
             }
         }
-        // TODO: proper error handling
-        Err(())
+        Err(LexerError::StringLiteralNotClosed)
     }
 
-    fn try_parse_identifier_and_keyword(&mut self) -> Result<Token, ()> {
+    fn parse_identifier_and_keyword(&mut self) -> Token {
         let start = self.cursor;
         while let Some(ch) = self.peek() {
             if !ch.is_alphanumeric() {
@@ -88,13 +116,13 @@ impl Lexer {
             .iter()
             .collect::<String>();
 
-        Ok(match result.as_str() {
+        match result.as_str() {
             "roots" => Token::Keyword(Keyword::Roots),
             _ => Token::Identifier(result),
-        })
+        }
     }
 
-    fn try_parse_number(&mut self) -> Result<Token, ()> {
+    fn try_parse_number(&mut self) -> Result<Token, LexerError> {
         let start = self.cursor;
         while let Some(ch) = self.peek() {
             if !ch.is_numeric() {
@@ -107,10 +135,14 @@ impl Lexer {
             .iter()
             .collect::<String>();
 
-        Ok(Token::NumberLiteral(result.parse::<i64>().map_err(|_| ())?))
+        let number = result
+            .parse::<i64>()
+            .map_err(|_| LexerError::InvalidNumberLiteral)?;
+
+        Ok(Token::NumberLiteral(number))
     }
 
-    fn next(&mut self) -> Result<Token, ()> {
+    fn next(&mut self) -> Result<Token, LexerError> {
         self.chop();
         let consume = self.consume();
         if let Some(current) = consume {
@@ -120,27 +152,35 @@ impl Lexer {
                 ')' => Ok(Token::CloseParen),
                 '=' => Ok(Token::Equals),
                 ',' => Ok(Token::Colon),
-                '\'' | '"' => Ok(self.try_parse_string_literal(current)?),
+                '\'' | '"' => self.try_parse_string_literal(current),
                 ch => {
                     if ch.is_numeric() {
-                        Ok(self.try_parse_number()?)
+                        self.try_parse_number()
                     } else if ch.is_alphabetic() {
-                        self.try_parse_identifier_and_keyword()
+                        Ok(self.parse_identifier_and_keyword())
                     } else {
-                        Err(())
+                        Err(LexerError::UnexpectedChar(ch))
                     }
                 }
             }
         } else {
-            Err(())
+            Err(LexerError::Eof)
         }
     }
 
-    pub fn parse(&mut self) -> Vec<Token> {
+    pub fn parse(&mut self) -> Result<Vec<Token>, LexerError> {
         let mut tokens = Vec::new();
-        while let Ok(token) = self.next() {
-            tokens.push(token);
+        loop {
+            match self.next() {
+                Ok(token) => tokens.push(token),
+                Err(err) => {
+                    if err == LexerError::Eof {
+                        break;
+                    }
+                    return Err(err);
+                }
+            }
         }
-        tokens
+        Ok(tokens)
     }
 }
