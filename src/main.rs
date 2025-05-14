@@ -1,8 +1,5 @@
-mod lexer;
-mod parser;
-
-use lexer::{Lexer, Token};
-use parser::{Expression, Parser, Statement};
+use reggae_lang::lexer::{Lexer, Token};
+use reggae_lang::parser::{Expression, Parser, Statement};
 use std::{collections::HashMap, env, error::Error, fs};
 
 enum Type {

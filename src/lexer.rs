@@ -4,7 +4,7 @@ use std::{
 };
 
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Roots,
     If,
@@ -36,7 +36,7 @@ impl Display for LexerError {
 
 impl Error for LexerError {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Identifier(String),
     Keyword(Keyword),
@@ -126,6 +126,9 @@ impl Lexer {
         let start = self.cursor;
         while let Some(ch) = self.peek() {
             if !ch.is_numeric() {
+                if ch.is_alphabetic() {
+                    return Err(LexerError::InvalidNumberLiteral);
+                }
                 break;
             }
             self.cursor += 1;
@@ -142,7 +145,7 @@ impl Lexer {
         Ok(Token::NumberLiteral(number))
     }
 
-    fn next(&mut self) -> Result<Token, LexerError> {
+    pub fn next(&mut self) -> Result<Token, LexerError> {
         self.chop();
         let consume = self.consume();
         if let Some(current) = consume {
