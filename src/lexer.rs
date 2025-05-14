@@ -12,6 +12,17 @@ pub enum Keyword {
     While,
 }
 
+impl Display for Keyword {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Keyword::Roots => write!(f, "roots"),
+            Keyword::If => todo!(),
+            Keyword::Else => todo!(),
+            Keyword::While => todo!(),
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum LexerError {
@@ -49,6 +60,22 @@ pub enum Token {
     CloseParen,
     Equals,
     Colon,
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Token::Identifier(_) => write!(f, "identifier"),
+            Token::Keyword(keyword) => write!(f, "{}", keyword),
+            Token::StringLiteral(_) => write!(f, "string literal"),
+            Token::NumberLiteral(_) => write!(f, "number literal"),
+            Token::SemiColon => write!(f, ";"),
+            Token::OpenParen => write!(f, "("),
+            Token::CloseParen => write!(f, ")"),
+            Token::Equals => write!(f, "="),
+            Token::Colon => write!(f, ","),
+        }
+    }
 }
 
 #[derive(Debug)]

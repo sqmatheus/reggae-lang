@@ -1,13 +1,24 @@
+use crate::lexer::{Keyword, Token};
 use std::{
     error::Error,
     fmt::{Display, Formatter},
 };
 
-use crate::lexer::{Keyword, Token};
+macro_rules! expect_token {
+    ($expr:expr, $token:ident) => {
+        if !matches!($expr, Some(Token::$token)) {
+            return Err(ParserError::ExpectedToken(Token::$token));
+        }
+    };
+}
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum ParserError {
+    InvalidFuncall,
+    ExpectedExpression,
+    ExpectedIdentifier,
+    ExpectedToken(Token),
     Eof,
     Unknown,
 }
@@ -15,6 +26,10 @@ pub enum ParserError {
 impl Display for ParserError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
+            ParserError::InvalidFuncall => write!(f, "Invalid funcall"),
+            ParserError::ExpectedExpression => write!(f, "Expected expression"),
+            ParserError::ExpectedIdentifier => write!(f, "Expected identifier"),
+            ParserError::ExpectedToken(token) => write!(f, "Expected token: {}", token),
             ParserError::Eof => write!(f, "End of file"),
             ParserError::Unknown => write!(f, "Unknown"),
         }
@@ -23,7 +38,7 @@ impl Display for ParserError {
 
 impl Error for ParserError {}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expression {
     Literal(Token),
     // Binary,
@@ -34,7 +49,7 @@ pub enum Expression {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     VariableDeclaration {
         name: String,
@@ -67,6 +82,13 @@ impl Parser {
         ch
     }
 
+    fn consume_expect_indentifier(&mut self) -> Result<String, ParserError> {
+        let Token::Identifier(identifier) = self.consume().ok_or(ParserError::Eof)? else {
+            return Err(ParserError::ExpectedIdentifier);
+        };
+        Ok(identifier)
+    }
+
     fn try_parse_expression(&mut self) -> Result<Expression, ParserError> {
         if let Some(token) = self.consume() {
             Ok(match token {
@@ -81,27 +103,19 @@ impl Parser {
                 _ => return Err(ParserError::Unknown),
             })
         } else {
-            Err(ParserError::Unknown)
+            Err(ParserError::Eof)
         }
     }
 
     fn try_parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
-        let variable_name = match self.consume() {
-            Some(Token::Identifier(name)) => name,
-            _ => return Err(ParserError::Unknown),
-        };
+        let variable_name = self.consume_expect_indentifier()?;
+        expect_token!(self.consume(), Equals);
 
-        match self.consume() {
-            Some(Token::Equals) => (),
-            _ => return Err(ParserError::Unknown),
-        };
+        let expression = self
+            .try_parse_expression()
+            .map_err(|_| ParserError::ExpectedExpression)?;
 
-        let expression = self.try_parse_expression()?;
-
-        match self.consume() {
-            Some(Token::SemiColon) => (),
-            _ => return Err(ParserError::Unknown),
-        };
+        expect_token!(self.consume(), SemiColon);
 
         Ok(Statement::VariableDeclaration {
             name: variable_name,
@@ -123,7 +137,7 @@ impl Parser {
             match token {
                 Token::CloseParen => {
                     if previous_colon {
-                        return Err(ParserError::Unknown);
+                        return Err(ParserError::InvalidFuncall);
                     }
 
                     self.cursor += 1;
@@ -131,7 +145,7 @@ impl Parser {
                 }
                 Token::Colon => {
                     if previous_colon {
-                        return Err(ParserError::Unknown);
+                        return Err(ParserError::InvalidFuncall);
                     }
 
                     self.cursor += 1;
@@ -139,7 +153,7 @@ impl Parser {
                 }
                 _ => {
                     if arguments.len() > 0 && !previous_colon {
-                        return Err(ParserError::Unknown);
+                        return Err(ParserError::InvalidFuncall);
                     }
 
                     arguments.push(self.try_parse_expression()?);
@@ -147,16 +161,12 @@ impl Parser {
                 }
             }
         }
-        Err(ParserError::Unknown)
+        Err(ParserError::InvalidFuncall)
     }
 
     fn try_parse_funcall_statment(&mut self, name: String) -> Result<Statement, ParserError> {
         let expression = self.try_parse_funcall(name)?;
-
-        match self.consume() {
-            Some(Token::SemiColon) => (),
-            _ => return Err(ParserError::Unknown),
-        };
+        expect_token!(self.consume(), SemiColon);
 
         Ok(Statement::ExpressionStatement(expression))
     }
@@ -168,7 +178,7 @@ impl Parser {
         }
     }
 
-    fn next(&mut self) -> Result<Statement, ParserError> {
+    pub fn next(&mut self) -> Result<Statement, ParserError> {
         if let Some(token) = self.consume() {
             match token {
                 Token::Keyword(keyword) => self.try_parse_keyword(keyword),
